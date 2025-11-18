@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Londrina+Solid:wght@300;400;900&family=Outfit:wght@200;300;400;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Socket.IO client -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <title>Brother Socket</title>
+
+    <style>
+      body {
+        font-family: "Outfit", sans-serif;
+      }
+
+      .json-key {
+        color: #86efac;
+      }
+      .json-string {
+        color: #93c5fd;
+      }
+      .json-number {
+        color: #facc15;
+      }
+      .json-boolean {
+        color: #fb7185;
+      }
+      .json-null {
+        color: #a5b4fc;
+      }
+
+      .font-londrina {
+        font-family: "Londrina Solid", cursive;
+      }
+
+      .dark body {
+        background-color: #0f0f0f;
+      }
+    </style>
+
+    <script>
+      // Enable dark / light mode based on saved preference
+      if (localStorage.getItem("theme") === "light") {
+        document.documentElement.classList.remove("dark");
+      } else {
+        document.documentElement.classList.add("dark");
+      }
+    </script>
+  </head>
+
+  <body
+    class="bg-gray-900 dark:bg-gray-50 dark:text-gray-900 min-h-screen text-gray-200 p-4 sm:p-6 lg:p-10 transition"
+  >
+    <div class="max-w-7xl mx-auto">
+      <!-- HEADER -->
+      <div
+        class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-8 gap-6"
+      >
+        <div>
+          <h1
+            class="text-4xl sm:text-5xl lg:text-6xl font-londrina font-bold tracking-wide dark:text-gray-900"
+          >
+            Brother Socket 😮‍💨
+          </h1>
+          <p class="text-gray-400 mt-1 hidden sm:block">
+            Realtime WebSocket event monitoring suite
+          </p>
+        </div>
+
+        <!-- Connected Clients -->
+        <div class="text-right">
+          <div class="text-gray-400 dark:text-gray-500 text-sm">
+            Active Clients
+          </div>
+          <div
+            id="clientCount"
+            class="text-3xl font-bold text-green-400 dark:text-green-600"
+          >
+            0
+          </div>
+        </div>
+      </div>
+
+      <!-- TOP TOOLBAR -->
+      <div class="flex flex-wrap items-center gap-3 justify-between mb-4">
+        <!-- Connection Controls -->
+        <div class="flex flex-col sm:flex-row gap-3 flex-1">
+          <input
+            id="wsUrl"
+            type="text"
+            placeholder="http://localhost:4000"
+            class="flex-1 px-4 py-2 rounded-xl bg-gray-700 border border-gray-600 text-gray-100 focus:ring focus:ring-blue-400 dark:bg-white dark:border-gray-300 dark:text-gray-900"
+          />
+
+          <div class="flex gap-3">
+            <button
+              id="connectBtn"
+              class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold"
+            >
+              Connect
+            </button>
+
+            <button
+              id="disconnectBtn"
+              class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold hidden"
+            >
+              Disconnect
+            </button>
+          </div>
+        </div>
+
+        <!-- Dark Mode Toggle -->
+        <button
+          id="themeToggle"
+          class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-gray-300"
+        >
+          🌙 Dark Mode
+        </button>
+      </div>
+
+      <!-- NAV TABS (desktop) -->
+      <div
+        class="hidden sm:flex gap-4 mb-4 border-b border-gray-700 dark:border-gray-300 pb-2"
+      >
+        <button
+          data-tab="events"
+          class="tab-btn font-semibold text-blue-400 border-b-2 border-blue-400 pb-1"
+        >
+          Events
+        </button>
+        <button
+          data-tab="charts"
+          class="tab-btn font-semibold text-gray-400 hover:text-white dark:hover:text-gray-900"
+        >
+          Charts
+        </button>
+        <button
+          data-tab="system"
+          class="tab-btn font-semibold text-gray-400 hover:text-white dark:hover:text-gray-900"
+        >
+          System Logs
+        </button>
+      </div>
+
+      <!-- MOBILE SIDEBAR TOGGLE -->
+      <div class="sm:hidden mb-4">
+        <button
+          id="mobileMenu"
+          class="w-full px-4 py-2 bg-blue-600 text-white rounded-xl"
+        >
+          Menu ▾
+        </button>
+
+        <div
+          id="mobileTabs"
+          class="hidden flex flex-col mt-2 bg-gray-800 p-4 rounded-xl border border-gray-700 dark:bg-gray-100 dark:border-gray-300"
+        >
+          <button
+            data-tab="events"
+            class="tab-btn text-left py-2 px-2 rounded-lg"
+          >
+            Events
+          </button>
+          <button
+            data-tab="charts"
+            class="tab-btn text-left py-2 px-2 rounded-lg"
+          >
+            Charts
+          </button>
+          <button
+            data-tab="system"
+            class="tab-btn text-left py-2 px-2 rounded-lg"
+          >
+            System Logs
+          </button>
+        </div>
+      </div>
+
+      <!-- CONTENT PANELS -->
+
+      <!-- EVENTS PANEL -->
+      <div id="tab-events" class="tab-panel">
+        <!-- Toolbar -->
+        <div class="flex flex-wrap gap-3 items-center mb-4">
+          <button
+            id="pauseBtn"
+            class="px-3 py-2 bg-yellow-500 hover:bg-yellow-600 text-black rounded-lg font-semibold"
+          >
+            Pause Feed
+          </button>
+
+          <button
+            id="downloadBtn"
+            class="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold"
+          >
+            Download Logs
+          </button>
+
+          <input
+            id="filterInput"
+            type="text"
+            placeholder="Filter events..."
+            class="flex-1 min-w-[150px] px-3 py-2 rounded-lg bg-gray-700 text-gray-100 border border-gray-600 focus:ring focus:ring-blue-400 dark:bg-white dark:border-gray-300 dark:text-gray-900"
+          />
+
+          <span id="status" class="text-sm text-gray-400 ml-auto"
+            >Not connected</span
+          >
+        </div>
+
+        <!-- LOG STREAM -->
+        <div
+          id="log"
+          class="h-[450px] sm:h-[550px] lg:h-[650px] bg-black dark:bg-gray-200 text-xs sm:text-sm p-3 sm:p-4 rounded-xl overflow-y-auto font-mono border border-gray-700 dark:border-gray-300 dark:text-gray-900"
+        ></div>
+      </div>
+
+      <!-- CHARTS PANEL -->
+      <div id="tab-charts" class="tab-panel hidden">
+        <h2 class="text-2xl font-semibold mb-4">
+          Event Rate (Events per Second)
+        </h2>
+
+        <div
+          class="relative h-64 sm:h-80 lg:h-96 bg-gray-800 dark:bg-gray-200 p-4 rounded-xl"
+        >
+          <canvas id="epsChart"></canvas>
+        </div>
+      </div>
+
+      <!-- SYSTEM PANEL -->
+      <div id="tab-system" class="tab-panel hidden">
+        <div
+          id="systemLog"
+          class="h-[500px] bg-black dark:bg-gray-200 text-gray-200 dark:text-gray-900 p-4 rounded-xl font-mono overflow-y-auto border border-gray-700 dark:border-gray-300"
+        ></div>
+      </div>
+
+      <!-- FOOTER -->
+      <footer
+        class="text-center mt-10 text-gray-500 dark:text-gray-600 text-sm"
+      >
+        Built with ❤️ by
+        <a
+          href="https://github.com/JonahGeek"
+          class="text-blue-400 hover:underline dark:text-blue-600"
+          target="_blank"
+        >
+          JonahGeek
+        </a>
+      </footer>
+    </div>
+
+    <script>
+      /* ---------------------------
+  Utilities & State
+----------------------------*/
+      const socketLib = window.io; // socket.io client from CDN
+      let socket = null;
+      let paused = false;
+      let logs = []; // all logs for download & re-render
+      let systemLogs = []; // separate system logs
+      let eventsThisSecond = 0; // counter for the current second
+      let epsWindow = 60; // number of seconds to show on chart
+      let epsData = Array(epsWindow).fill(0); // sliding window
+      let epsLabels = Array.from({ length: epsWindow }, (_, i) => "");
+      let epsTimer = null;
+      let chart = null;
+
+      /* DOM refs */
+      const logEl = document.getElementById("log");
+      const systemLogEl = document.getElementById("systemLog");
+      const filterInput = document.getElementById("filterInput");
+      const pauseBtn = document.getElementById("pauseBtn");
+      const downloadBtn = document.getElementById("downloadBtn");
+      const clientCountEl = document.getElementById("clientCount");
+      const statusEl = document.getElementById("status");
+      const connectBtn = document.getElementById("connectBtn");
+      const disconnectBtn = document.getElementById("disconnectBtn");
+      const wsUrlInput = document.getElementById("wsUrl");
+      const themeToggle = document.getElementById("themeToggle");
+      const mobileMenu = document.getElementById("mobileMenu");
+      const mobileTabs = document.getElementById("mobileTabs");
+
+      /* Helper: pretty JSON -> HTML with syntax highlighting */
+      function syntaxHighlight(json) {
+        if (json === undefined)
+          return '<span class="text-gray-400">undefined</span>';
+        if (typeof json !== "string") {
+          try {
+            json = JSON.stringify(json, null, 2);
+          } catch {
+            json = String(json);
+          }
+        }
+        json = json
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+
+        return json.replace(
+          /("(?:\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(?:\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+          (match) => {
+            let cls = "json-number";
+            if (/^"/.test(match)) {
+              cls = /:$/.test(match) ? "json-key" : "json-string";
+            } else if (/true|false/.test(match)) {
+              cls = "json-boolean";
+            } else if (/null/.test(match)) {
+              cls = "json-null";
+            }
+            return `<span class="${cls}">${match}</span>`;
+          }
+        );
+      }
+
+      /* Color/badge helper */
+      function eventColor(eventName) {
+        const n = eventName?.toString()?.toLowerCase() || "";
+        if (n === "notification") return "bg-green-600 text-white";
+        if (n === "system" || n === "connect" || n === "disconnect")
+          return "bg-blue-600 text-white";
+        if (n.includes("error") || n === "error" || n === "connect_error")
+          return "bg-red-600 text-white";
+        if (n === "client_count") return "bg-indigo-600 text-white";
+        return "bg-gray-600 text-white";
+      }
+
+      /* Append to system log area */
+      function appendSystemLog(obj) {
+        const ts = new Date().toLocaleTimeString();
+        systemLogs.push({ ts: Date.now(), obj });
+        const wrapper = document.createElement("div");
+        wrapper.className = "mb-3 text-sm";
+        wrapper.innerHTML = `<div class="text-xs text-gray-400">${ts}</div><div class="mt-1">${syntaxHighlight(
+          obj
+        )}</div>`;
+        systemLogEl.prepend(wrapper);
+        // cap system log length
+        if (systemLogs.length > 1000) {
+          systemLogs.shift();
+          if (systemLogEl.children.length > 1000)
+            systemLogEl.removeChild(systemLogEl.lastChild);
+        }
+      }
+
+      /* Append main event log */
+      function appendLog(eventName, payload, meta = {}) {
+        // maintain logs array for downloads
+        const entry = { ts: Date.now(), event: eventName, payload, meta };
+        logs.push(entry);
+
+        // increment EPS counter
+        eventsThisSecond++;
+
+        // apply filter
+        const search = (filterInput.value || "").toLowerCase();
+        const payloadText =
+          typeof payload === "object"
+            ? JSON.stringify(payload)
+            : String(payload);
+        if (
+          search &&
+          !eventName.toLowerCase().includes(search) &&
+          !payloadText.toLowerCase().includes(search)
+        ) {
+          return;
+        }
+
+        if (paused) return;
+
+        const time = new Date().toLocaleTimeString();
+        const badgeCls = eventColor(eventName);
+
+        const card = document.createElement("div");
+        card.className =
+          "mb-4 p-3 sm:p-4 bg-gray-900 dark:bg-white rounded-xl border border-gray-700 dark:border-gray-300 transition";
+
+        // header: badge & timestamp
+        const header = document.createElement("div");
+        header.className = "flex flex-wrap justify-between items-center gap-2";
+        header.innerHTML = `<span class="px-3 py-1 text-xs font-semibold rounded-full ${badgeCls}">${eventName}</span>
+                      <span class="text-xs text-gray-400 dark:text-gray-600">${time}</span>`;
+
+        // body: pretty JSON or text
+        const pre = document.createElement("pre");
+        pre.className =
+          "mt-3 whitespace-pre-wrap text-gray-200 dark:text-gray-900 leading-relaxed";
+        pre.innerHTML = syntaxHighlight(payload);
+
+        // collapse / expand button
+        const actions = document.createElement("div");
+        actions.className = "mt-2 flex gap-2";
+        const copyBtn = document.createElement("button");
+        copyBtn.className =
+          "px-2 py-1 text-xs rounded bg-gray-700 dark:bg-gray-200";
+        copyBtn.textContent = "Copy";
+        copyBtn.onclick = () => {
+          navigator.clipboard
+            .writeText(JSON.stringify(payload, null, 2))
+            .then(() => {
+              copyBtn.textContent = "Copied";
+              setTimeout(() => (copyBtn.textContent = "Copy"), 1200);
+            });
+        };
+
+        const detailsBtn = document.createElement("button");
+        detailsBtn.className =
+          "px-2 py-1 text-xs rounded bg-gray-700 dark:bg-gray-200";
+        detailsBtn.textContent = "Details";
+        detailsBtn.onclick = () => {
+          // toggle detail styling (simple collapse)
+          if (pre.style.display === "none") {
+            pre.style.display = "";
+            detailsBtn.textContent = "Details";
+          } else {
+            pre.style.display = "none";
+            detailsBtn.textContent = "Details";
+            // open modal? for now keep simple
+          }
+        };
+
+        actions.appendChild(copyBtn);
+        actions.appendChild(detailsBtn);
+
+        card.appendChild(header);
+        card.appendChild(pre);
+        card.appendChild(actions);
+
+        // newest at top
+        logEl.prepend(card);
+
+        // cap logs in DOM to prevent memory growth
+        const MAX_DOM = 1000;
+        if (logEl.childElementCount > MAX_DOM) {
+          logEl.removeChild(logEl.lastChild);
+        }
+      }
+
+      /* Rerender logs (used by filter) */
+      function rerenderLogs() {
+        logEl.innerHTML = "";
+        // render most recent first
+        for (let i = logs.length - 1; i >= 0; i--) {
+          appendLog(logs[i].event, logs[i].payload, logs[i].meta);
+        }
+      }
+
+      /* Pause/Resume button */
+      pauseBtn.onclick = () => {
+        paused = !paused;
+        pauseBtn.textContent = paused ? "Resume Feed" : "Pause Feed";
+        pauseBtn.classList.toggle("bg-yellow-700");
+      };
+
+      /* Download logs */
+      downloadBtn.onclick = () => {
+        const blob = new Blob([JSON.stringify(logs, null, 2)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `socket_logs_${new Date().toISOString()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+
+      /* Filter input */
+      filterInput.addEventListener("input", () => {
+        // re-render
+        logEl.innerHTML = "";
+        for (let i = logs.length - 1; i >= 0; i--) {
+          const entry = logs[i];
+          const search = (filterInput.value || "").toLowerCase();
+          const payloadText =
+            typeof entry.payload === "object"
+              ? JSON.stringify(entry.payload)
+              : String(entry.payload);
+          if (
+            !search ||
+            entry.event.toLowerCase().includes(search) ||
+            payloadText.toLowerCase().includes(search)
+          ) {
+            appendLog(entry.event, entry.payload, entry.meta);
+          }
+        }
+      });
+
+      /* Mobile menu toggle */
+      mobileMenu?.addEventListener("click", () => {
+        if (!mobileTabs) return;
+        mobileTabs.classList.toggle("hidden");
+      });
+
+      /* Tab behavior (desktop + mobile) */
+      function activateTab(tabName) {
+        // hide all panels
+        document
+          .querySelectorAll(".tab-panel")
+          .forEach((p) => p.classList.add("hidden"));
+        // remove active header tab classes
+        document
+          .querySelectorAll(".tab-btn")
+          .forEach((b) =>
+            b.classList.remove("text-blue-400", "border-blue-400", "pb-1")
+          );
+
+        // show selected
+        document.getElementById(`tab-${tabName}`).classList.remove("hidden");
+
+        // mark active header button
+        document.querySelectorAll(`[data-tab="${tabName}"]`).forEach((b) => {
+          b.classList.add("text-blue-400", "border-blue-400", "pb-1");
+        });
+      }
+
+      document.querySelectorAll(".tab-btn").forEach((b) => {
+        b.addEventListener("click", (e) => {
+          const tab = b.getAttribute("data-tab");
+          activateTab(tab);
+          // mobile: hide menu after selection
+          if (!mobileTabs.classList.contains("hidden"))
+            mobileTabs.classList.add("hidden");
+        });
+      });
+
+      // default active
+      activateTab("events");
+
+      /* Dark/light mode toggle */
+      function setTheme(theme) {
+        if (theme === "light") {
+          document.documentElement.classList.remove("dark");
+          localStorage.setItem("theme", "light");
+          themeToggle.textContent = "☀️ Light";
+        } else {
+          document.documentElement.classList.add("dark");
+          localStorage.setItem("theme", "dark");
+          themeToggle.textContent = "🌙 Dark";
+        }
+      }
+      themeToggle.addEventListener("click", () => {
+        const isDark = document.documentElement.classList.contains("dark");
+        setTheme(isDark ? "light" : "dark");
+      });
+      // initial label
+      setTheme(localStorage.getItem("theme") === "light" ? "light" : "dark");
+
+      /* ---------------------------
+  Chart: Events per second (EPS)
+----------------------------*/
+      function initChart() {
+        const ctx = document.getElementById("epsChart").getContext("2d");
+        // populate initial labels (last N seconds)
+        const now = Date.now();
+        epsLabels = Array.from({ length: epsWindow }, (_, i) => {
+          const t = new Date(now - (epsWindow - i - 1) * 1000);
+          return t.toLocaleTimeString();
+        });
+
+        const cfg = {
+          type: "line",
+          data: {
+            labels: epsLabels,
+            datasets: [
+              {
+                label: "Events / sec",
+                data: epsData,
+                fill: true,
+                tension: 0.25,
+                borderColor: "#60a5fa",
+                backgroundColor: "rgba(96,165,250,0.12)",
+                pointRadius: 0,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: {
+                grid: { display: false },
+                ticks: {
+                  color: getComputedStyle(
+                    document.documentElement
+                  ).getPropertyValue("--tw-text-opacity")
+                    ? "#9CA3AF"
+                    : "#9CA3AF",
+                },
+              },
+              y: {
+                beginAtZero: true,
+                ticks: { color: "#9CA3AF" },
+              },
+            },
+            plugins: {
+              legend: { display: false },
+            },
+          },
+        };
+
+        chart = new Chart(ctx, cfg);
+
+        // start the timer to shift window every second
+        epsTimer = setInterval(() => {
+          // shift in current second count
+          epsData.push(eventsThisSecond);
+          if (epsData.length > epsWindow) epsData.shift();
+
+          const now = new Date();
+          epsLabels.push(now.toLocaleTimeString());
+          if (epsLabels.length > epsWindow) epsLabels.shift();
+
+          // reset counter
+          eventsThisSecond = 0;
+
+          if (chart) {
+            chart.data.labels = epsLabels;
+            chart.data.datasets[0].data = epsData;
+            chart.update("none");
+          }
+        }, 1000);
+      }
+
+      /* Initialize chart once DOM ready */
+      initChart();
+
+      /* ---------------------------
+  Socket connection & events
+----------------------------*/
+      function safeConnect(url) {
+        if (socket) {
+          try {
+            socket.disconnect();
+          } catch {}
+          socket = null;
+        }
+
+        try {
+          // allow transport negotiation (no forcing)
+          socket = socketLib(url, { autoConnect: true });
+
+          statusEl.textContent = "Connecting...";
+          appendSystemLog({ message: `Attempting connection to ${url}` });
+
+          socket.on("connect", () => {
+            appendSystemLog({ event: "connect", socketId: socket.id });
+            statusEl.textContent = "Connected ✓";
+            connectBtn.classList.add("hidden");
+            disconnectBtn.classList.remove("hidden");
+            // request client count if server supports it; otherwise server should emit 'client_count' on connect
+          });
+
+          socket.on("disconnect", (reason) => {
+            appendSystemLog({ event: "disconnect", reason });
+            statusEl.textContent = "Disconnected";
+            connectBtn.classList.remove("hidden");
+            disconnectBtn.classList.add("hidden");
+            clientCountEl.textContent = "0";
+          });
+
+          socket.on("connect_error", (err) => {
+            appendSystemLog({ event: "connect_error", error: err.message });
+            statusEl.textContent = "Connection error";
+          });
+
+          // client_count often emitted by the server
+          socket.on("client_count", (count) => {
+            clientCountEl.textContent = String(count);
+            appendSystemLog({ event: "client_count", count });
+          });
+
+          // capture generic events
+          socket.onAny((event, payload) => {
+            // update clientCount if payload contains it (some servers send)
+            if (event === "client_count" && typeof payload === "number") {
+              clientCountEl.textContent = String(payload);
+            }
+
+            // log system events into system panel for visibility
+            const low = (event || "").toLowerCase();
+            if (
+              low === "connect" ||
+              low === "disconnect" ||
+              low === "error" ||
+              low === "connect_error" ||
+              low === "client_count"
+            ) {
+              appendSystemLog({ event, payload });
+            } else {
+              appendLog(event, payload);
+            }
+          });
+
+          // if server supports "ping" or metrics you can hook here
+        } catch (err) {
+          appendSystemLog({ error: err.message });
+          statusEl.textContent = "Connection failed";
+        }
+      }
+
+      /* Bind connect/disconnect UI */
+      connectBtn.onclick = () => {
+        const url = wsUrlInput.value.trim();
+        if (!url) {
+          alert("Enter Socket.IO URL (e.g. http://localhost:4000)");
+          return;
+        }
+        safeConnect(url);
+      };
+
+      disconnectBtn.onclick = () => {
+        if (socket) {
+          try {
+            socket.disconnect();
+          } catch (err) {
+            /* ignore */
+          }
+          socket = null;
+          statusEl.textContent = "Disconnected";
+          connectBtn.classList.remove("hidden");
+          disconnectBtn.classList.add("hidden");
+        }
+      };
+
+      /* Clean up on page unload */
+      window.addEventListener("beforeunload", () => {
+        try {
+          if (socket) socket.disconnect();
+        } catch {}
+        try {
+          if (chart) chart.destroy();
+        } catch {}
+        if (epsTimer) clearInterval(epsTimer);
+      });
+    </script>
+  </body>
+</html>
